@@ -1744,7 +1744,7 @@ noborder(Client *c)
 	int monocle_layout = 0;
 
 	if (&monocle == c->mon->lt[c->mon->sellt]->arrange)
-		monocle_layout = 0;
+		monocle_layout = 1;
 
 	if (!monocle_layout && (nexttiled(c->mon->clients) != c || nexttiled(c->next)))
 		return 0;
@@ -1758,7 +1758,7 @@ noborder(Client *c)
 	if (c->fakefullscreen != 1 && c->isfullscreen)
 		return 0;
 
-	return 0;
+	return 1;
 }
 
 void
@@ -2779,57 +2779,44 @@ getfacts(Monitor *m, int msize, int ssize, float *mf, float *sf, int *mr, int *s
 	*sf = sfacts; // total factor of stack area
 	*mr = msize - mtotal; // the remainder (rest) of pixels after a cfacts master split
 	*sr = ssize - stotal; // the remainder (rest) of pixels after a cfacts stack split
-
 }
 
 static void
 tile(Monitor *m)
 {
 	unsigned int i, n;
-	int mx, my, mw, mh;     // master area
-	int sx, sy, sw, sh;     // stack area
-	float mfacts = 0, sfacts = 0;
-	int mrest = 0, srest = 0;
+	int mx = 0, my = 0, mh = 0, mw = 0;
+	int sx = 0, sy = 0, sh = 0, sw = 0;
+	float mfacts, sfacts;
+	int mrest, srest;
 	Client *c;
 
-	// Count number of tiled clients
 	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+
 	if (n == 0)
 		return;
 
-	// Set up area dimensions with outer gaps
-	mx = sx = m->wx + gappih;
-	my = sy = m->wy + gappiv;
-	mw = sw = m->ww - 2 * gappih;
-	mh = sh = m->wh - 2 * gappiv;
+	sx = mx = m->wx;
+	sy = my = m->wy;
+	sh = mh = m->wh;
+	sw = mw = m->ww;
 
-	// Divide master and stack areas
 	if (m->nmaster && n > m->nmaster) {
-		mw = (m->ww - 2 * gappih - gappiv) * m->mfact;
-		sw = m->ww - 2 * gappih - gappiv - mw;
-		sx = mx + mw + gappiv;
+		sw = mw * (1 - m->mfact);
+		mw = mw * m->mfact;
+		sx = mx + mw;
 	}
-
-	// Account for inner vertical gaps in height calculations
-	mh -= (m->nmaster > 1 ? (m->nmaster - 1) * gappiv : 0);
-	sh -= ((n - m->nmaster - 1) > 0 ? (n - m->nmaster - 1) * gappiv : 0);
 
 	getfacts(m, mh, sh, &mfacts, &sfacts, &mrest, &srest);
 
-	// Position and resize clients
-	for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++) {
+	for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 		if (i < m->nmaster) {
-			int h = (mh / mfacts) * c->cfact + (i < mrest ? 1 : 0);
-			resize(c, mx, my, mw - (2 * c->bw), h - (2 * c->bw), 0);
-			if (i + 1 < m->nmaster)
-				my += h + gappiv;
+			resize(c, mx, my, mw - (2*c->bw), (mh / mfacts) * c->cfact + (i < mrest ? 1 : 0) - (2*c->bw), 0);
+			my += HEIGHT(c);
 		} else {
-			int h = (sh / sfacts) * c->cfact + ((i - m->nmaster) < srest ? 1 : 0);
-			resize(c, sx, sy, sw - (2 * c->bw), h - (2 * c->bw), 0);
-			if (i + 1 < n)
-				sy += h + gappiv;
+			resize(c, sx, sy, sw - (2*c->bw), (sh / sfacts) * c->cfact + ((i - m->nmaster) < srest ? 1 : 0) - (2*c->bw), 0);
+			sy += HEIGHT(c);
 		}
-	}
 }
 
 void
